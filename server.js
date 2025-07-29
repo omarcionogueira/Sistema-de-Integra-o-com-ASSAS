@@ -6,43 +6,42 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Webhook endpoint
 app.post("/webhook", async (req, res) => {
   try {
     const { event, customer, subscription } = req.body;
 
     console.log("📩 Webhook recebido!");
-    console.log("Evento:", event);
-    console.log("Cliente:", customer?.name, "-", customer?.email);
-    console.log("Assinatura ID:", subscription?.id, "Status:", subscription?.status);
 
-    // ✅ URL correta (use seu domínio real aqui se for outro)
-    const url = "https://gadaiada-m74r.onrender.com/apps/webkul/api/vendor";
+    if (event === "SUBSCRIPTION_PAYMENT_SUCCESS") {
+      // Dados para criar o vendedor
+      const vendedorPayload = {
+        name: customer.name,
+        email: customer.email,
+        password: "senha123", // ⚠️ Pode gerar senha aleatória ou pedir depois
+        phone: "55" + Math.floor(Math.random() * 1000000000), // Simulado
+        subscriptionId: subscription.id
+      };
 
-    // Simula envio de dados para a API externa
-    const response = await axios.post(url, {
-      nome: customer?.name,
-      email: customer?.email,
-      plano: subscription?.id
-    }, {
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": "sua-chave-secreta-aqui"
-      }
-    });
+      // Envia para Webkul
+      const response = await axios.post("https://YOUR-DOMAIN.com/apps/webkul/api/vendor", vendedorPayload, {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": "SUA_CHAVE_API_WEBKUL"
+        }
+      });
 
-    console.log("📤 Requisição enviada com sucesso:", response.status);
+      console.log("✅ Vendedor criado com sucesso!", response.data);
 
-    res.status(200).send("Tudo certo! Vendedor criado e e-mail enviado.");
+      res.status(200).send("Vendedor criado no Webkul com sucesso!");
+    } else {
+      console.log("📌 Evento ignorado:", event);
+      res.status(200).send("Evento recebido, mas ignorado.");
+    }
+
   } catch (error) {
-    console.error("❌ Erro interno:", error.message);
-    res.status(500).send("Erro interno no servidor.");
+    console.error("❌ Erro ao criar vendedor:", error.message);
+    res.status(500).send("Erro interno ao criar vendedor.");
   }
-});
-
-// Rota de teste
-app.get("/", (req, res) => {
-  res.send("🚀 Servidor rodando!");
 });
 
 app.listen(PORT, () => {

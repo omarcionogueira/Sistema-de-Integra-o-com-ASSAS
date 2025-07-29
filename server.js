@@ -1,54 +1,59 @@
-// server.js
-const express = require("express");
-const axios = require("axios");
-const crypto = require("crypto"); // para gerar senha segura
+const express = require('express');
+const axios = require('axios');
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-app.post("/webhook", async (req, res) => {
+// 🔒 Token do Webkul
+const WEBKUL_TOKEN = 'MjQwN2UyODg3MDEwNmVlMjI5Nzc1NmNkYjdjZTM1N2FkNjk4YzdmMWJmMmRkOWFiNGIyNjA2YmI5ZTA4ZjgzNg';
+
+// 📡 Endpoint do Webkul
+const WEBKUL_URL = 'https://mvmapi.webkul.com/api/v2/sellers.json';
+
+app.post('/webhook', async (req, res) => {
+  console.log('[LOG] Webhook recebido:', req.body);
+
+  // 🔁 Adapta o payload para o formato aceito pela Webkul
   try {
-    const { event, customer, subscription } = req.body;
+    const webhookPayload = req.body;
 
-    console.log("📩 Webhook recebido!");
-
-    // Aceita evento em português ou inglês
-    const evento = event?.toUpperCase()?.trim();
-    const eventosAceitos = ["SUBSCRIPTION_PAYMENT_SUCCESS", "SUCESSO_PAGAMENTO_DA_ASSINATURA"];
-
-    if (!eventosAceitos.includes(evento)) {
-      console.log("📌 Evento não tratado:", evento);
-      return res.status(200).send("Evento ignorado.");
+    // 🔎 Verifica se o campo "vendedor" existe
+    if (!webhookPayload.vendedor) {
+      console.log('[LOG] Evento ignorado: campo "vendedor" ausente');
+      return res.status(200).send('Evento ignorado');
     }
 
-    // Dados do vendedor
-    const senhaGerada = crypto.randomBytes(8).toString("hex");
-    const vendedorPayload = {
-      name: customer.name,
-      email: customer.email,
-      password: senhaGerada,
-      phone: "55" + Math.floor(Math.random() * 1000000000).toString(), // simulado
-      plano: subscription.id
+    // ✅ Adapta os campos
+    const sellerPayload = {
+      seller: {
+        email: webhookPayload.vendedor['e-mail'],
+        name: webhookPayload.vendedor.nome,
+        shop: {
+          title: webhookPayload.vendedor.loja.title
+        }
+      }
     };
 
-    // Envio para Webkul
-    const response = await axios.post("https://SEU-DOMINIO.com/apps/webkul/api/vendor", vendedorPayload, {
+    console.log('[LOG] Payload adaptado para Webkul:', sellerPayload);
+
+    // 🚀 Envia para a API do Webkul
+    const response = await axios.post(WEBKUL_URL, sellerPayload, {
       headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": "SUA_API_KEY_DO_WEBKUL"
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${WEBKUL_TOKEN}`
       }
     });
 
-    console.log("✅ Vendedor criado no Webkul!", response.data);
-
-    res.status(200).send("Vendedor criado com sucesso no Webkul.");
+    console.log('[LOG] Resposta da API Webkul:', response.data);
+    res.status(200).send('Vendedor criado com sucesso');
   } catch (error) {
-    console.error("❌ Falha ao criar vendedor:", error.message);
-    res.status(500).send("Erro ao criar vendedor.");
+    console.error('[ERRO] Falha ao enviar para Webkul:', error.response?.data || error.message);
+    res.status(500).send('Erro ao criar vendedor');
   }
 });
 
+// 🚀 Inicia o servidor
+const PORT = 3000;
 app.listen(PORT, () => {
-  console.log(`🌐 Servidor rodando na porta ${PORT}`);
+  console.log(`[LOG] Servidor rodando na porta ${PORT}`);
 });
